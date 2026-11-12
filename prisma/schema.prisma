@@ -1,0 +1,163 @@
+// TrojanTix data model
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum Role {
+  STUDENT
+  ADMIN
+}
+
+enum ListingStatus {
+  LISTED
+  PAYMENT_HELD
+  TRANSFERRED
+  COMPLETED
+  CANCELLED
+  DISPUTED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  studentId    String   @unique // fake 10-digit USC ID
+  enrolled     Boolean  @default(true)
+  role         Role     @default(STUDENT)
+  passwordHash String
+  createdAt    DateTime @default(now())
+
+  tickets       Ticket[]         @relation("TicketOwner")
+  sales         Listing[]        @relation("Seller")
+  purchases     Listing[]        @relation("Buyer")
+  sessions      Session[]
+  challenges    LoginChallenge[]
+  notifications Notification[]
+  activity      ActivityLog[]
+  reports       ScamReport[]
+}
+
+// Pending second factor for a login attempt
+model LoginChallenge {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeHash  String
+  attempts  Int      @default(0)
+  expiresAt DateTime
+  consumed  Boolean  @default(false)
+  ip        String
+  userAgent String
+  createdAt DateTime @default(now())
+}
+
+model Session {
+  id        String   @id // sha256 of the cookie token
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ip        String
+  userAgent String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model Game {
+  id             String    @id @default(cuid())
+  opponent       String
+  kickoff        DateTime
+  venue          String    @default("Los Angeles Memorial Coliseum")
+  faceValueCents Int
+  tickets        Ticket[]
+  listings       Listing[]
+}
+
+model Ticket {
+  id             String    @id @default(cuid())
+  gameId         String
+  game           Game      @relation(fields: [gameId], references: [id])
+  ownerId        String
+  owner          User      @relation("TicketOwner", fields: [ownerId], references: [id])
+  section        String
+  row            String
+  seat           String
+  faceValueCents Int
+  qrSecret       String // rotated on every transfer so old screenshots die
+  usedAt         DateTime?
+  transferCount  Int       @default(0)
+  listings       Listing[]
+
+  @@unique([gameId, section, row, seat])
+}
+
+// A listing doubles as the escrow order once a buyer pays.
+model Listing {
+  id              String        @id @default(cuid())
+  ticketId        String
+  ticket          Ticket        @relation(fields: [ticketId], references: [id])
+  gameId          String
+  game            Game          @relation(fields: [gameId], references: [id])
+  sellerId        String
+  seller          User          @relation("Seller", fields: [sellerId], references: [id])
+  buyerId         String?
+  buyer           User?         @relation("Buyer", fields: [buyerId], references: [id])
+  priceCents      Int
+  feeCents        Int
+  status          ListingStatus @default(LISTED)
+  paymentProvider String? // "stripe" | "mock"
+  paymentRef      String? // Stripe Checkout Session / PaymentIntent id, or mock ref
+  cancelReason    String?
+  disputeReason   String?
+  createdAt       DateTime      @default(now())
+  heldAt          DateTime?
+  transferredAt   DateTime?
+  completedAt     DateTime?
+  cancelledAt     DateTime?
+  disputedAt      DateTime?
+  reports         ScamReport[]
+
+  @@index([gameId, status])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind      String // LISTED | SOLD | TRANSFERRED | PAYOUT | REFUND | SECURITY | ...
+  title     String
+  body      String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model ActivityLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  email      String? // recorded even for failed/unknown logins
+  action     String
+  detail     String   @default("")
+  ip         String   @default("")
+  userAgent  String   @default("")
+  suspicious Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model ScamReport {
+  id          String   @id @default(cuid())
+  reporterId  String
+  reporter    User     @relation(fields: [reporterId], references: [id])
+  listingId   String?
+  listing     Listing? @relation(fields: [listingId], references: [id])
+  source      String // e.g. GroupMe, Instagram, TrojanTix listing
+  description String
+  status      String   @default("OPEN") // OPEN | REVIEWED
+  createdAt   DateTime @default(now())
+}
