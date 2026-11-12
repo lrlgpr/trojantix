@@ -153,3 +153,13 @@ src/app/…                 pages: tickets, sell, games, checkout, orders, notif
 - Rate limits are in memory (single server). Production would use Redis.
 - Email alerts are logged to the in-app Alerts panel and the console instead of being sent.
 - The Stripe return URL is verified server-side, but there is no webhook handler. Production should also listen for `checkout.session.completed`.
+
+## Running it on a phone
+
+1. Start the app on your computer (`npm run dev`).
+2. **Same Wi-Fi:** open the `Network:` address that `npm run dev` prints (e.g. `http://192.168.1.20:3000`) on your phone. Campus guest networks often block this.
+3. **Anywhere:** in a second terminal run `npx cloudflared tunnel --url http://localhost:3000` and open the `https://….trycloudflare.com` link it prints. HTTPS is also required for the gate scanner's camera on phones. Anyone with the link can reach the app while the tunnel runs, so stop it when you're done.
+
+## License
+
+[MIT](LICENSE). Free to use, modify and share. TrojanTix is a student prototype and is not affiliated with or endorsed by USC.
