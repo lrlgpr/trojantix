@@ -163,6 +163,7 @@ src/app/…                 pages: tickets, sell, games, checkout, orders, notif
 ## Contributors
 
 - [@lrlgpr](https://github.com/lrlgpr): creator and maintainer
+- [Claude](https://claude.ai) (Anthropic): AI coding assistant; helped build the app
 
 Want to help? Fork the repo, make a branch, and open a pull request.
 
